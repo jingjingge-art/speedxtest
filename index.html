@@ -74,7 +74,7 @@
   <main>
     <p class="eyebrow">INTERNET SPEED TEST</p>
     <h1>网络测速</h1>
-    <p class="intro">使用 Cloudflare 官方测速服务测量当前网络的下载和上传速度。</p>
+    <p class="intro">先测试下载 25 秒，再测试上传 15 秒</p>
     <button id="startBtn" type="button">开始测速</button>
     <div id="status" role="status" aria-live="polite">准备就绪</div>
     <section class="results" aria-label="测速结果">
@@ -90,7 +90,7 @@
       </article>
     </section>
     <p class="notice">
-      本测试会向 Cloudflare 的测速网络发送下载和上传请求。根据 Cloudflare 官方说明，测试结果会被收集用于汇总分析。点击开始即表示你已知悉这一点。<br>
+      下载与上传依次测试，速度按测试窗口内传输的数据量除以实际用时计算。测速请求发送到 Cloudflare 官方测速服务；请勿连续频繁运行。Cloudflare 的官方 SDK 会收集其 SDK 测试结果用于汇总分析；本页直接请求公开测速接口，不使用该 SDK。<br>
       <a href="https://github.com/cloudflare/speedtest" target="_blank" rel="noopener noreferrer">查看 Cloudflare Speedtest 说明</a>
     </p>
   </main>
@@ -103,68 +103,150 @@
       var uploadEl = document.getElementById("upload");
       var downloadBytesEl = document.getElementById("downloadBytes");
       var uploadBytesEl = document.getElementById("uploadBytes");
-      var running = false;
+      var downloadUrl = "https://speed.cloudflare.com/__down";
+      var uploadUrl = "https://speed.cloudflare.com/__up";
+      var runId = 0;
 
-      function showBandwidth(bps, valueEl, bytesEl) {
-        if (typeof bps !== "number" || !Number.isFinite(bps) || bps <= 0) {
+      function showBandwidth(bytes, elapsedMs, valueEl, bytesEl) {
+        if (!elapsedMs || !Number.isFinite(bytes) || bytes <= 0) {
           valueEl.textContent = "—";
           bytesEl.textContent = "约 — MB/s";
           return;
         }
-        var mbps = bps / 1000000;
+        var mbps = bytes * 8 / (elapsedMs / 1000) / 1000000;
         valueEl.textContent = mbps.toFixed(2);
         bytesEl.textContent = "约 " + (mbps / 8).toFixed(2) + " MB/s";
       }
 
-      function render(results) {
-        showBandwidth(results.getDownloadBandwidth(), downloadEl, downloadBytesEl);
-        showBandwidth(results.getUploadBandwidth(), uploadEl, uploadBytesEl);
+      function createUploadPayload(size) {
+        var bytes = new Uint8Array(size);
+        if (window.crypto && window.crypto.getRandomValues) {
+          for (var offset = 0; offset < size; offset += 65536) {
+            window.crypto.getRandomValues(bytes.subarray(offset, Math.min(offset + 65536, size)));
+          }
+        } else {
+          for (var i = 0; i < size; i++) bytes[i] = Math.random() * 256;
+        }
+        return new Blob([bytes], { type: "application/octet-stream" });
+      }
+
+      // Runs bounded concurrent requests for a fixed time, counting transmitted bytes.
+      function measure(direction, durationMs, streams, payloadSize, thisRun) {
+        return new Promise(function (resolve, reject) {
+          var active = true;
+          var totalBytes = 0;
+          var requests = [];
+          var startTime = performance.now();
+          var uploadPayload = direction === "upload" ? createUploadPayload(payloadSize) : null;
+          var failures = 0;
+          var timer = setTimeout(stop, durationMs);
+
+          function stop() {
+            if (!active) return;
+            active = false;
+            clearTimeout(timer);
+            requests.forEach(function (xhr) {
+              try { xhr.abort(); } catch (_) {}
+            });
+            resolve({ bytes: totalBytes, elapsedMs: performance.now() - startTime });
+          }
+
+          function startRequest(streamIndex) {
+            if (!active || thisRun !== runId) return;
+            var xhr = new XMLHttpRequest();
+            requests[streamIndex] = xhr;
+            var lastLoaded = 0;
+            var url = direction === "download"
+              ? downloadUrl + "?bytes=" + payloadSize + "&r=" + Math.random()
+              : uploadUrl + "?r=" + Math.random();
+
+            function addProgress(loaded) {
+              if (!active || thisRun !== runId) return;
+              var delta = loaded - lastLoaded;
+              if (delta > 0) totalBytes += delta;
+              lastLoaded = loaded;
+            }
+
+            xhr.onprogress = function (event) {
+              if (direction === "download") addProgress(event.loaded);
+            };
+            if (direction === "upload") {
+              xhr.upload.onprogress = function (event) { addProgress(event.loaded); };
+            }
+            xhr.onload = function () {
+              if (!active || thisRun !== runId) return;
+              if (xhr.status < 200 || xhr.status >= 300) {
+                failures++;
+                if (failures >= 3) {
+                  active = false;
+                  clearTimeout(timer);
+                  requests.forEach(function (request) { try { request.abort(); } catch (_) {} });
+                  reject(new Error("测速服务器返回 HTTP " + xhr.status));
+                  return;
+                }
+              }
+              startRequest(streamIndex);
+            };
+            xhr.onerror = xhr.ontimeout = function () {
+              if (!active || thisRun !== runId) return;
+              failures++;
+              if (failures >= 3) {
+                active = false;
+                clearTimeout(timer);
+                requests.forEach(function (request) { try { request.abort(); } catch (_) {} });
+                reject(new Error("无法连接测速服务器，请检查网络或浏览器跨域限制。"));
+                return;
+              }
+              setTimeout(function () { startRequest(streamIndex); }, 250);
+            };
+
+            try {
+              if (direction === "download") xhr.responseType = "arraybuffer";
+              xhr.timeout = 12000;
+              xhr.open(direction === "download" ? "GET" : "POST", url, true);
+              if (direction === "upload") xhr.send(uploadPayload);
+              else xhr.send();
+            } catch (error) {
+              xhr.onerror();
+            }
+          }
+
+          for (var i = 0; i < streams; i++) startRequest(i);
+          // If this test was superseded or timed out, ensure its promise settles.
+          if (thisRun !== runId) stop();
+        });
       }
 
       startButton.addEventListener("click", async function () {
-        if (running) return;
-        running = true;
+        var thisRun = ++runId;
         startButton.disabled = true;
-        startButton.textContent = "正在启动…";
-        statusText.textContent = "正在连接 Cloudflare 测速网络…";
+        startButton.textContent = "测速进行中…";
         downloadEl.textContent = "—";
         uploadEl.textContent = "—";
         downloadBytesEl.textContent = "约 — MB/s";
         uploadBytesEl.textContent = "约 — MB/s";
 
         try {
-          // Cloudflare 官方示例使用的浏览器模块；测速数据通过其官方 SDK 采集。
-          var module = await import("https://cdn.skypack.dev/@cloudflare/speedtest");
-          var SpeedTest = module.default;
-          var engine = new SpeedTest({ autoStart: false });
+          statusText.textContent = "正在测试下载速度（25 秒）…";
+          var download = await measure("download", 25000, 4, 10000000, thisRun);
+          if (thisRun !== runId) return;
+          showBandwidth(download.bytes, download.elapsedMs, downloadEl, downloadBytesEl);
 
-          engine.onResultsChange = function () {
-            render(engine.results);
-            statusText.textContent = "测速进行中…";
-          };
-          engine.onError = function (message, httpStatus) {
-            console.warn("Cloudflare speed test error:", message, httpStatus);
-            statusText.textContent = httpStatus
-              ? "测速请求遇到问题（HTTP " + httpStatus + "），正在尝试继续…"
-              : "测速请求遇到问题，正在尝试继续…";
-          };
-          engine.onFinish = function (results) {
-            render(results);
-            statusText.textContent = "测速完成";
+          statusText.textContent = "下载完成，正在测试上传速度（15 秒）…";
+          var upload = await measure("upload", 15000, 2, 2000000, thisRun);
+          if (thisRun !== runId) return;
+          showBandwidth(upload.bytes, upload.elapsedMs, uploadEl, uploadBytesEl);
+          statusText.textContent = "测速完成";
+        } catch (error) {
+          if (thisRun === runId) {
+            statusText.textContent = error.message || "测速失败，请检查网络后重试。";
+            console.error(error);
+          }
+        } finally {
+          if (thisRun === runId) {
             startButton.disabled = false;
             startButton.textContent = "重新测速";
-            running = false;
-          };
-
-          startButton.textContent = "测速进行中…";
-          statusText.textContent = "已连接，正在测量网络速度…";
-          engine.play();
-        } catch (error) {
-          console.error(error);
-          statusText.textContent = "无法加载 Cloudflare 测速组件，请检查网络后重试。";
-          startButton.disabled = false;
-          startButton.textContent = "重新测速";
-          running = false;
+          }
         }
       });
     })();
