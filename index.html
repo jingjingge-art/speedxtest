@@ -4,9 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101a33">
-  <title>中国科学技术大学测速网站</title>
+  <title>网络测速（Cloudflare）</title>
   <link rel="shortcut icon" href="favicon.ico">
-  <script src="speedtest.js"></script>
   <style>
     :root {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
@@ -33,10 +32,7 @@
     .eyebrow { margin: 0 0 10px; color: #8ca9ff; font-size: .78rem; font-weight: 700; letter-spacing: .16em; }
     h1 { margin: 0; font-size: clamp(1.7rem, 5vw, 2.4rem); }
     .intro { margin: 12px 0 26px; color: #aab6d0; line-height: 1.7; }
-    .address-links { margin: -12px 0 24px; color: #9eacc6; font-size: .9rem; }
-    a { color: #9ab5ff; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    #startStopBtn {
+    #startBtn {
       min-width: 180px;
       padding: 14px 28px;
       border: 0;
@@ -50,8 +46,8 @@
       box-shadow: 0 8px 26px #526fff44;
       transition: transform .18s ease, filter .18s ease;
     }
-    #startStopBtn:hover { filter: brightness(1.1); transform: translateY(-1px); }
-    #startStopBtn.running { background: linear-gradient(135deg, #ed6675, #cf3e5a); }
+    #startBtn:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
+    #startBtn:disabled { cursor: wait; opacity: .7; }
     #status { min-height: 1.6em; margin: 18px 0 26px; color: #c1cbe0; }
     .results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
     .result {
@@ -64,33 +60,8 @@
     .result-value { color: #fff; font-size: clamp(2rem, 8vw, 3rem); font-variant-numeric: tabular-nums; font-weight: 750; }
     .result-unit { margin-left: 6px; color: #aab6d0; font-size: .95rem; }
     .conversion { display: block; margin-top: 8px; color: #93a2bf; font-size: .85rem; }
-    .footer { margin: 24px 0 0; color: #8290aa; font-size: .82rem; line-height: 1.7; }
-    .privacy {
-      margin: 18px auto 0;
-      padding: 0;
-      border: 0;
-      background: none;
-      color: #9ab5ff;
-      font: inherit;
-      font-size: .88rem;
-      cursor: pointer;
-    }
-    #privacyPolicy {
-      position: fixed;
-      inset: 5vh 5vw;
-      z-index: 10;
-      overflow: auto;
-      padding: 26px;
-      border: 1px solid #ffffff24;
-      border-radius: 16px;
-      background: #111b31;
-      box-shadow: 0 0 0 100vmax #0009;
-      text-align: left;
-    }
-    #privacyPolicy[hidden] { display: none; }
-    #privacyPolicy h2 { margin-top: 0; }
-    #privacyPolicy li { margin: 8px 0; color: #c1cbe0; }
-    .closePrivacy { display: block; margin: 20px auto 0; }
+    .notice { margin: 22px 0 0; padding: 12px 14px; border: 1px solid #ffffff16; border-radius: 12px; color: #aab6d0; font-size: .82rem; line-height: 1.65; text-align: left; }
+    .notice a { color: #9ab5ff; }
     @media (max-width: 480px) {
       body { padding: 18px 10px; }
       main { border-radius: 18px; }
@@ -102,105 +73,98 @@
 <body>
   <main>
     <p class="eyebrow">INTERNET SPEED TEST</p>
-    <h1>中国科学技术大学测速网站</h1>
-    <p class="intro">测试当前网络的下载和上传速度</p>
-    <p class="address-links"><a href="https://test.ustc.edu.cn/">IPv4</a>　/　<a href="https://test6.ustc.edu.cn/">IPv6</a></p>
-    <button id="startStopBtn" type="button">开始测速</button>
+    <h1>网络测速</h1>
+    <p class="intro">使用 Cloudflare 官方测速服务测量当前网络的下载和上传速度。</p>
+    <button id="startBtn" type="button">开始测速</button>
     <div id="status" role="status" aria-live="polite">准备就绪</div>
     <section class="results" aria-label="测速结果">
       <article class="result">
         <span class="result-label">下载速度</span>
-        <span id="dlResult" class="result-value">—</span><span class="result-unit">Mbps</span>
-        <span id="dlConversion" class="conversion">约 — MB/s</span>
+        <span id="download" class="result-value">—</span><span class="result-unit">Mbps</span>
+        <span id="downloadBytes" class="conversion">约 — MB/s</span>
       </article>
       <article class="result">
         <span class="result-label">上传速度</span>
-        <span id="ulResult" class="result-value">—</span><span class="result-unit">Mbps</span>
-        <span id="ulConversion" class="conversion">约 — MB/s</span>
+        <span id="upload" class="result-value">—</span><span class="result-unit">Mbps</span>
+        <span id="uploadBytes" class="conversion">约 — MB/s</span>
       </article>
     </section>
-    <p class="footer">Mbps 为兆比特/秒，MB/s 为兆字节/秒（Mbps ÷ 8）。测速结果仅显示在页面上，不再加载结果文件。</p>
-    <button class="privacy" type="button" onclick="document.getElementById('privacyPolicy').hidden=false">隐私说明</button>
+    <p class="notice">
+      本测试会向 Cloudflare 的测速网络发送下载和上传请求。根据 Cloudflare 官方说明，测试结果会被收集用于汇总分析。点击开始即表示你已知悉这一点。<br>
+      <a href="https://github.com/cloudflare/speedtest" target="_blank" rel="noopener noreferrer">查看 Cloudflare Speedtest 说明</a>
+    </p>
   </main>
-  <section id="privacyPolicy" role="dialog" aria-modal="true" aria-labelledby="privacyTitle" hidden>
-    <h2 id="privacyTitle">隐私说明</h2>
-    <p>此页面直接在浏览器中显示下载和上传测速结果，不加载 result.php，也不向遥测接口提交测速结果。测速本身仍会连接配置的测速服务器接口。</p>
-    <button class="privacy closePrivacy" type="button" onclick="document.getElementById('privacyPolicy').hidden=true">关闭</button>
-  </section>
 
   <script>
     (function () {
-      var speedtest = new Speedtest();
-      var button = document.getElementById("startStopBtn");
-      var status = document.getElementById("status");
-      var dlResult = document.getElementById("dlResult");
-      var ulResult = document.getElementById("ulResult");
-      var dlConversion = document.getElementById("dlConversion");
-      var ulConversion = document.getElementById("ulConversion");
-      var latestData = null;
+      var startButton = document.getElementById("startBtn");
+      var statusText = document.getElementById("status");
+      var downloadEl = document.getElementById("download");
+      var uploadEl = document.getElementById("upload");
+      var downloadBytesEl = document.getElementById("downloadBytes");
+      var uploadBytesEl = document.getElementById("uploadBytes");
+      var running = false;
 
-      // 保留原测速库及其默认测试顺序，仅把下载/上传各延长到 30 秒并关闭遥测。
-      speedtest.setParameter("time_dl_max", 30);
-      speedtest.setParameter("time_ul_max", 30);
-      speedtest.setParameter("telemetry_level", "none");
-      speedtest.setParameter("getIp_ispInfo", false);
-
-      function formatSpeed(value) {
-        if (value === "Fail") return "失败";
-        var number = Number(value);
-        return value === "" || !Number.isFinite(number) ? "—" : number.toFixed(2);
-      }
-      function formatBytes(value) {
-        var number = Number(value);
-        return value === "" || value === "Fail" || !Number.isFinite(number)
-          ? "约 — MB/s"
-          : "约 " + (number / 8).toFixed(2) + " MB/s";
-      }
-      function renderResults(data) {
-        if (!data) return;
-        dlResult.textContent = formatSpeed(data.dlStatus);
-        ulResult.textContent = formatSpeed(data.ulStatus);
-        dlConversion.textContent = formatBytes(data.dlStatus);
-        ulConversion.textContent = formatBytes(data.ulStatus);
-      }
-      function finish(aborted) {
-        button.classList.remove("running");
-        button.textContent = "再测一次";
-        if (aborted) {
-          status.textContent = "测速已取消";
+      function showBandwidth(bps, valueEl, bytesEl) {
+        if (typeof bps !== "number" || !Number.isFinite(bps) || bps <= 0) {
+          valueEl.textContent = "—";
+          bytesEl.textContent = "约 — MB/s";
           return;
         }
-        renderResults(latestData);
-        status.textContent = "测速完成";
+        var mbps = bps / 1000000;
+        valueEl.textContent = mbps.toFixed(2);
+        bytesEl.textContent = "约 " + (mbps / 8).toFixed(2) + " MB/s";
       }
-      button.addEventListener("click", function () {
-        if (speedtest.getState() === 3) {
-          speedtest.abort();
-          return;
-        }
-        latestData = null;
-        dlResult.textContent = "—";
-        ulResult.textContent = "—";
-        dlConversion.textContent = "约 — MB/s";
-        ulConversion.textContent = "约 — MB/s";
-        button.classList.add("running");
-        button.textContent = "取消测速";
-        status.textContent = "正在准备测速…";
-        speedtest.onupdate = function (data) {
-          latestData = data;
-          if (data.testState === 1) status.textContent = "正在测试下载速度…";
-          else if (data.testState === 2) status.textContent = "下载完成，正在测试网络响应…";
-          else if (data.testState === 3) status.textContent = "正在测试上传速度…";
-          renderResults(data);
-        };
-        speedtest.onend = finish;
+
+      function render(results) {
+        showBandwidth(results.getDownloadBandwidth(), downloadEl, downloadBytesEl);
+        showBandwidth(results.getUploadBandwidth(), uploadEl, uploadBytesEl);
+      }
+
+      startButton.addEventListener("click", async function () {
+        if (running) return;
+        running = true;
+        startButton.disabled = true;
+        startButton.textContent = "正在启动…";
+        statusText.textContent = "正在连接 Cloudflare 测速网络…";
+        downloadEl.textContent = "—";
+        uploadEl.textContent = "—";
+        downloadBytesEl.textContent = "约 — MB/s";
+        uploadBytesEl.textContent = "约 — MB/s";
+
         try {
-          speedtest.start();
+          // Cloudflare 官方示例使用的浏览器模块；测速数据通过其官方 SDK 采集。
+          var module = await import("https://cdn.skypack.dev/@cloudflare/speedtest");
+          var SpeedTest = module.default;
+          var engine = new SpeedTest({ autoStart: false });
+
+          engine.onResultsChange = function () {
+            render(engine.results);
+            statusText.textContent = "测速进行中…";
+          };
+          engine.onError = function (message, httpStatus) {
+            console.warn("Cloudflare speed test error:", message, httpStatus);
+            statusText.textContent = httpStatus
+              ? "测速请求遇到问题（HTTP " + httpStatus + "），正在尝试继续…"
+              : "测速请求遇到问题，正在尝试继续…";
+          };
+          engine.onFinish = function (results) {
+            render(results);
+            statusText.textContent = "测速完成";
+            startButton.disabled = false;
+            startButton.textContent = "重新测速";
+            running = false;
+          };
+
+          startButton.textContent = "测速进行中…";
+          statusText.textContent = "已连接，正在测量网络速度…";
+          engine.play();
         } catch (error) {
-          button.classList.remove("running");
-          button.textContent = "重新测速";
-          status.textContent = "无法启动测速，请检查服务器测速接口是否可访问。";
           console.error(error);
+          statusText.textContent = "无法加载 Cloudflare 测速组件，请检查网络后重试。";
+          startButton.disabled = false;
+          startButton.textContent = "重新测速";
+          running = false;
         }
       });
     })();
