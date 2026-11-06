@@ -3,77 +3,102 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101a33">
   <title>网络测速</title>
   <script src="speedtest.js"></script>
   <style>
+    :root {
+      color-scheme: dark;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: #0b1224;
+      color: #f4f7ff;
+    }
     * { box-sizing: border-box; }
     body {
+      min-height: 100vh;
       margin: 0;
-      padding: 32px 16px;
-      color: #202124;
-      background: #f5f7fb;
-      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-      text-align: center;
+      padding: 48px 18px;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(ellipse at 50% 0, #1d3262 0, #0b1224 62%);
     }
     main {
-      width: min(100%, 620px);
-      margin: 0 auto;
-      padding: 32px 24px;
-      background: #fff;
-      border-radius: 16px;
-      box-shadow: 0 8px 30px #18284818;
+      width: min(100%, 760px);
+      padding: clamp(24px, 5vw, 48px);
+      border: 1px solid #ffffff18;
+      border-radius: 24px;
+      background: #111b31eF;
+      box-shadow: 0 24px 80px #0006;
+      text-align: center;
     }
-    h1 { margin: 0 0 8px; font-size: 1.8rem; }
-    .intro { margin: 0 0 24px; color: #5f6368; }
+    .eyebrow {
+      margin: 0 0 10px;
+      color: #8ca9ff;
+      font-size: .78rem;
+      font-weight: 700;
+      letter-spacing: .16em;
+    }
+    h1 { margin: 0; font-size: clamp(1.8rem, 5vw, 2.5rem); }
+    .intro { margin: 12px 0 28px; color: #aab6d0; line-height: 1.7; }
     #startStopBtn {
-      min-width: 150px;
-      padding: 12px 24px;
+      min-width: 180px;
+      padding: 14px 28px;
       border: 0;
-      border-radius: 8px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #5b86ff, #7655ef);
       color: #fff;
-      background: #315efb;
+      font: inherit;
       font-size: 1rem;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
+      box-shadow: 0 8px 26px #526fff44;
+      transition: transform .18s ease, filter .18s ease;
     }
+    #startStopBtn:hover { filter: brightness(1.1); transform: translateY(-1px); }
     #startStopBtn:disabled { cursor: wait; opacity: .7; }
-    #startStopBtn.running { background: #d93025; }
-    #status { min-height: 1.5em; margin: 18px 0; color: #5f6368; }
-    .results { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    #startStopBtn.running { background: linear-gradient(135deg, #ed6675, #cf3e5a); box-shadow: 0 8px 26px #cf3e5a44; }
+    #status { min-height: 1.6em; margin: 18px 0 28px; color: #c1cbe0; }
+    .results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
     .result {
-      padding: 22px 12px;
-      border: 1px solid #e8eaed;
-      border-radius: 12px;
-      background: #fafbff;
+      padding: 26px 18px;
+      border: 1px solid #ffffff16;
+      border-radius: 18px;
+      background: linear-gradient(145deg, #1a2844, #141e34);
     }
-    .label { display: block; margin-bottom: 10px; color: #5f6368; }
-    .value { font-size: clamp(1.7rem, 6vw, 2.5rem); font-weight: 700; color: #315efb; }
-    .unit { margin-left: 5px; color: #5f6368; font-size: .95rem; }
-    .note { margin: 22px 0 0; color: #80868b; font-size: .85rem; }
-    @media (max-width: 420px) {
-      main { padding: 26px 16px; }
+    .result-label { display: block; margin-bottom: 14px; color: #b6c2da; font-size: .98rem; }
+    .result-value { color: #fff; font-size: clamp(2rem, 8vw, 3.2rem); font-variant-numeric: tabular-nums; font-weight: 750; letter-spacing: -.04em; }
+    .result-unit { margin-left: 7px; color: #aab6d0; font-size: .95rem; }
+    .conversion { display: block; margin-top: 9px; color: #93a2bf; font-size: .85rem; }
+    .footnote { margin: 24px 0 0; color: #8290aa; font-size: .82rem; line-height: 1.6; }
+    @media (max-width: 520px) {
+      body { padding: 20px 12px; }
+      main { border-radius: 18px; }
       .results { gap: 10px; }
-      .result { padding: 18px 8px; }
+      .result { padding: 22px 10px; }
     }
   </style>
 </head>
 <body>
   <main>
+    <p class="eyebrow">INTERNET SPEED TEST</p>
     <h1>网络测速</h1>
-    <p class="intro">点击按钮测试当前网络的下载和上传速度</p>
+    <p class="intro">测量当前网络的下载与上传速度。测试时间约为 20 秒。</p>
     <button id="startStopBtn" type="button">开始测速</button>
     <div id="status" role="status" aria-live="polite">准备就绪</div>
+
     <section class="results" aria-label="测速结果">
-      <div class="result">
-        <span class="label">下载速度</span>
-        <span id="dlResult" class="value">—</span><span class="unit">Mbps</span>
-      </div>
-      <div class="result">
-        <span class="label">上传速度</span>
-        <span id="ulResult" class="value">—</span><span class="unit">Mbps</span>
-      </div>
+      <article class="result">
+        <span class="result-label">下载速度</span>
+        <span id="dlResult" class="result-value">—</span><span class="result-unit">Mbps</span>
+        <span id="dlConversion" class="conversion">约 — MB/s</span>
+      </article>
+      <article class="result">
+        <span class="result-label">上传速度</span>
+        <span id="ulResult" class="result-value">—</span><span class="result-unit">Mbps</span>
+        <span id="ulConversion" class="conversion">约 — MB/s</span>
+      </article>
     </section>
-    <p class="note">测速结果仅显示在本页面，不保存到结果数据库。</p>
+    <p class="footnote">速度以 Mbps（兆比特/秒）显示；括号数值为换算后的 MB/s（兆字节/秒）。结果只显示在本页面，不保存到测速结果数据库。</p>
   </main>
 
   <script>
@@ -83,14 +108,15 @@
       var status = document.getElementById("status");
       var dlResult = document.getElementById("dlResult");
       var ulResult = document.getElementById("ulResult");
+      var dlConversion = document.getElementById("dlConversion");
+      var ulConversion = document.getElementById("ulConversion");
       var latestData = null;
 
-      // 只测下载和上传；关闭 IP 查询及遥测，因此不需要 result.php 或数据库。
-      speedtest.setParameter("test_order", "D_U");
+      // 保留 LibreSpeed 原有测速实现与默认测试顺序，只延长下载/上传测试时间并关闭结果上报。
+      speedtest.setParameter("time_dl_max", 10);
+      speedtest.setParameter("time_ul_max", 10);
       speedtest.setParameter("telemetry_level", "none");
       speedtest.setParameter("getIp_ispInfo", false);
-      speedtest.setParameter("time_dl_max", 5);
-      speedtest.setParameter("time_ul_max", 5);
 
       function showSpeed(value) {
         if (value === "Fail") return "失败";
@@ -98,17 +124,29 @@
         return value === "" || !Number.isFinite(number) ? "—" : number.toFixed(2);
       }
 
+      function showConversion(value) {
+        var number = Number(value);
+        return value === "" || value === "Fail" || !Number.isFinite(number)
+          ? "约 — MB/s"
+          : "约 " + (number / 8).toFixed(2) + " MB/s";
+      }
+
+      function renderResults(data) {
+        if (!data) return;
+        dlResult.textContent = showSpeed(data.dlStatus);
+        ulResult.textContent = showSpeed(data.ulStatus);
+        dlConversion.textContent = showConversion(data.dlStatus);
+        ulConversion.textContent = showConversion(data.ulStatus);
+      }
+
       function finish(aborted) {
         button.classList.remove("running");
-        button.textContent = "重新测速";
+        button.textContent = "再测一次";
         if (aborted) {
           status.textContent = "测速已取消";
           return;
         }
-        if (latestData) {
-          dlResult.textContent = showSpeed(latestData.dlStatus);
-          ulResult.textContent = showSpeed(latestData.ulStatus);
-        }
+        renderResults(latestData);
         status.textContent = "测速完成";
       }
 
@@ -121,14 +159,19 @@
         latestData = null;
         dlResult.textContent = "—";
         ulResult.textContent = "—";
+        dlConversion.textContent = "约 — MB/s";
+        ulConversion.textContent = "约 — MB/s";
         button.classList.add("running");
         button.textContent = "取消测速";
         status.textContent = "正在准备测速…";
 
         speedtest.onupdate = function (data) {
           latestData = data;
-          if (data.testState === 1) status.textContent = "正在测试下载速度…";
+          if (data.testState === 0 || data.testState === -1) status.textContent = "正在准备测速…";
+          else if (data.testState === 1) status.textContent = "正在测试下载速度…";
+          else if (data.testState === 2) status.textContent = "下载测试完成，正在测量网络响应…";
           else if (data.testState === 3) status.textContent = "正在测试上传速度…";
+          renderResults(data);
         };
         speedtest.onend = finish;
 
